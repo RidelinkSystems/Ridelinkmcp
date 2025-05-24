@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id                  String   @id @default(cuid())
+  customerId          String
+  pickupLocation      Json
+  deliveryLocation    Json
+  pickupTime          DateTime
+  deliveryTime        DateTime?
+  weight              Float
+  dimensions          Json
+  specialRequirements String?
+  status              OrderStatus @default(PENDING)
+  estimatedCost       Float?
+  finalCost           Float?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  transporter   Transporter? @relation(fields: [transporterId], references: [id])
+  transporterId String?
+  route         Route?
+  trackingData  TrackingData[]
+  matchingHistory MatchingHistory[]
+
+  @@map("orders")
+}
+
+model Transporter {
+  id               String   @id @default(cuid())
+  name             String
+  licenseNumber    String   @unique
+  phoneNumber      String
+  email            String   @unique
+  vehicleType      VehicleType
+  capacityWeight   Float
+  capacityVolume   Float
+  currentLocation  Json?
+  availabilityStatus TransporterStatus @default(AVAILABLE)
+  rating           Float    @default(0)
+  totalDeliveries  Int      @default(0)
+  isVerified       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  orders          Order[]
+  routes          Route[]
+  trackingData    TrackingData[]
+  matchingHistory MatchingHistory[]
+
+  @@map("transporters")
+}
+
+model Route {
+  id                String   @id @default(cuid())
+  orderId           String   @unique
+  transporterId     String
+  optimizedPath     Json
+  estimatedDuration Int      // in minutes
+  actualDuration    Int?     // in minutes
+  distance          Float    // in kilometers
+  fuelCost          Float?
+  tollCost          Float?
+  status            RouteStatus @default(PLANNED)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  order       Order       @relation(fields: [orderId], references: [id])
+  transporter Transporter @relation(fields: [transporterId], references: [id])
+
+  @@map("routes")
+}
+
+model TrackingData {
+  id            String   @id @default(cuid())
+  transporterId String
+  orderId       String?
+  latitude      Float
+  longitude     Float
+  speed         Float?
+  heading       Float?
+  batteryLevel  Int?
+  timestamp     DateTime @default(now())
+
+  // Relations
+  transporter Transporter @relation(fields: [transporterId], references: [id])
+  order       Order?      @relation(fields: [orderId], references: [id])
+
+  @@map("tracking_data")
+}
+
+model MatchingHistory {
+  id             String   @id @default(cuid())
+  orderId        String
+  transporterId  String
+  matchScore     Float
+  assignmentTime DateTime @default(now())
+  completionTime DateTime?
+  rating         Float?
+  cost           Float?
+  notes          String?
+
+  // Relations
+  order       Order       @relation(fields: [orderId], references: [id])
+  transporter Transporter @relation(fields: [transporterId], references: [id])
+
+  @@map("matching_history")
+}
+
+enum OrderStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+enum TransporterStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+  MAINTENANCE
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  CAR
+  VAN
+  TRUCK_SMALL
+  TRUCK_MEDIUM
+  TRUCK_LARGE
+}
+
+enum RouteStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
